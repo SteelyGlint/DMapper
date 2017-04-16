@@ -1,0 +1,19 @@
+body {
+	color:#000000;
+	background-color:#B3B3B3;
+	margin:0;
+}
+
+#container {
+	margin-left:auto;
+	margin-right:auto;
+	text-align:center;
+}
+
+canvas {
+	border: 2px solid black;
+}
+
+a img {
+	border:none;
+}
