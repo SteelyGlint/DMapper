@@ -4,8 +4,6 @@ var canvas_x;
 var canvas_y;
 var frame_margin = 96;
 
-var arr_room = get2DArray(max_dim);
-
 var saved_col = 0
 var saved_row = 0
 var curr_row = 0
@@ -17,30 +15,25 @@ var scale_factor = 1;
 var mouse_pix = {x: null, y: null};
 var translate_x = 0;
 var translate_y = 0;
+var canvas_offset_x = 0;
+var canvas_offset_y = 0;
 
 var saved_floor_paths = new ClipperLib.Paths();
 var solution_paths = new ClipperLib.Paths();
+var current_path = new ClipperLib.Path();
+
+var tool_selector;
+var tool_mode = 'poly';
+
+function ev_tool_change (evt) { 
+	tool_mode = this.value;
+} 
 
 function init() {
-	for(var row=0; row < max_dim; row++) {
-		for(var col=0; col < max_dim; col++) {
-			arr_room[row][col] = 0;
-			if( Math.random() > 0.5 )
-			{
-				//arr_room[row][col] = 1;
-			}
-		}
-	}
 	var canvas = document.getElementById('mapzone');
 	var ctx = canvas.getContext('2d');
 	canvas_x = canvas.width;
 	canvas_y = canvas.height;
-	
-	draw();
-}
-
-function draw() {
-	var canvas = document.getElementById('mapzone');
 	
 	canvas.addEventListener('mousedown',mousedown,false);
 	canvas.addEventListener('mouseup',mouseup,false);
@@ -48,6 +41,36 @@ function draw() {
 	canvas.addEventListener('contextmenu',contextmenu,false);
 	canvas.addEventListener('mouseout', mouseout, false);
 	canvas.addEventListener('DOMMouseScroll', mousewheel, false);
+	
+	tool_selector = document.getElementById('selector'); 
+	tool_selector.addEventListener('change', ev_tool_change, false);
+	
+	var canvasRectangle = canvas.getBoundingClientRect();
+	canvas_offset_x = canvasRectangle.left;
+	canvas_offset_y = canvasRectangle.top;
+	
+	draw();
+}
+
+function draw_paths(ctx, paths)
+{
+	var ii, jj, x, y;
+	ctx.beginPath();
+	for(ii = 0; ii < paths.length; ii++) {
+		for(jj = 0; jj < paths[ii].length; jj++) {
+			x = paths[ii][jj].X;
+			y = paths[ii][jj].Y;
+			if (!jj) ctx.moveTo(x, y);
+			else ctx.lineTo(x, y);
+		}
+		ctx.closePath();
+	}
+	ctx.stroke();
+	ctx.fill();
+}
+
+function draw() {
+	var canvas = document.getElementById('mapzone');
 
 	if (canvas.getContext) {
 		var ctx = canvas.getContext('2d');
@@ -78,59 +101,73 @@ function draw() {
 		ctx.strokeStyle = 'rgb(50, 45, 45)';
 		ctx.lineWidth = 16;
 		ctx.lineJoin = 'miter';
+		ctx.miterLimit = 3
 		
-		var ii, jj, x, y;
-		ctx.beginPath();
-		for(ii = 0; ii < saved_floor_paths.length; ii++) {
-			for(jj = 0; jj < saved_floor_paths[ii].length; jj++) {
-				x = saved_floor_paths[ii][jj].X;
-				y = saved_floor_paths[ii][jj].Y;
-				if (!jj) ctx.moveTo(x, y);
-				else ctx.lineTo(x, y);
+		// draw the walkable floor data
+		draw_paths(ctx, saved_floor_paths);
+		
+		if( !key_shift ) ctx.strokeStyle = 'rgb(90, 245, 150)';
+		else 			 ctx.strokeStyle = 'rgb(230, 125, 125)';
+		ctx.lineWidth = 2 / scale_factor;
+		if( select_box ) {			
+			if( tool_mode == 'rect' )
+			{
+				// draw rectangular selection box
+				ctx.setLineDash([4, 3]);
+				ctx.strokeRect( 32*Math.min(saved_row, curr_row),
+								32*Math.min(saved_col, curr_col),
+								32*(1 + Math.abs(saved_row-curr_row)),
+								32*(1 + Math.abs(saved_col-curr_col)));
 			}
-			ctx.closePath();
+			if( tool_mode == 'poly' )
+			{
+				ctx.strokeRect( curr_row*32-4, curr_col*32-4, 8, 8 );
+				
+				// the new line to be added
+				ctx.setLineDash([4, 3]);
+				ctx.beginPath();
+				if( current_path.length > 0 )
+					ctx.moveTo(current_path[current_path.length-1].X,
+							   current_path[current_path.length-1].Y);	// previously added vertex
+				else
+					ctx.moveTo(saved_row*32, saved_col*32);	// first vertex
+				ctx.lineTo(curr_row*32, curr_col*32);		// currently selected vertex
+				ctx.stroke();
+			}
 		}
-		ctx.stroke();
-		ctx.fill();
-
-		/*
-		for(var row=0; row < max_dim; row++) {
-			for(var col=0; col < max_dim; col++) {
-				if( arr_room[row][col] > 0 )
-				{
-					ctx.strokeRect(32*row, 32*col, 32, 32);
-				}
-			}
-		}
 		
-		for(var row=0; row < max_dim; row++) {
-			for(var col=0; col < max_dim; col++) {
-				if( arr_room[row][col] > 0 )
-				{
-					ctx.fillRect(32*row, 32*col, 32, 32);
-				}
-			}
-		}*/
-		
-		if( select_box ) {
-			if( select_box ) { ctx.strokeStyle = 'rgb(90, 245, 150)'; }
-			if( key_shift ) { ctx.strokeStyle = 'rgb(230, 125, 125)'; }
-			ctx.setLineDash([4, 3]);
-			ctx.lineWidth = 2 / scale_factor;
-			ctx.strokeRect( 32*Math.min(saved_row, curr_row),
-							32*Math.min(saved_col, curr_col),
-							32*(1 + Math.abs(saved_row-curr_row)),
-							32*(1 + Math.abs(saved_col-curr_col)));
+		// draw any polygon in progess
+		if( tool_mode == 'poly' && current_path.length > 0 )
+		{
+			var paths_to_draw = new ClipperLib.Paths();
+			paths_to_draw.push(current_path);
+			ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+			ctx.setLineDash([]);
+			draw_paths(ctx, paths_to_draw);
+			if( current_path.length > 0 )
+				ctx.strokeRect( current_path[0].X-4, current_path[0].Y-4, 8, 8 );
 		}
 		
 		ctx.restore();
 	}
 }
 
-function set_curr_pos(evt)
+function get_cell_pos(evt)
 {
-	curr_row = Math.floor(evt.clientX / (32*scale_factor) - translate_x/32);
-	curr_col = Math.floor(evt.clientY / (32*scale_factor) - translate_y/32);
+	curr_row = Math.floor((evt.clientX-canvas_offset_x)/(32*scale_factor) - translate_x/32);
+	curr_col = Math.floor((evt.clientY-canvas_offset_y)/(32*scale_factor) - translate_y/32);
+	
+	if( curr_row < 0 ) curr_row = 0;
+	if( curr_col < 0 ) curr_col = 0;
+	
+	if( curr_row >= max_dim ) curr_row = max_dim-1;
+	if( curr_col >= max_dim ) curr_col = max_dim-1;
+}
+
+function get_grid_pos(evt)
+{
+	curr_row = Math.floor((evt.clientX-canvas_offset_x)/(32*scale_factor)+(32/2-translate_x)/32);
+	curr_col = Math.floor((evt.clientY-canvas_offset_y)/(32*scale_factor)+(32/2-translate_y)/32);
 	
 	if( curr_row < 0 ) curr_row = 0;
 	if( curr_col < 0 ) curr_col = 0;
@@ -147,9 +184,16 @@ function mousedown(evt)
 	
 	if( evt.which == 1 && !drag_pan ) {
 		select_box = true;
-		set_curr_pos(evt);
-		saved_row = curr_row;
-		saved_col = curr_col;
+		if( tool_mode == 'rect' ) {
+			get_cell_pos(evt);
+			saved_row = curr_row;
+			saved_col = curr_col;
+		}
+		if( tool_mode == 'poly' ) {
+			get_grid_pos(evt);
+			saved_row = curr_row;
+			saved_col = curr_col;
+		}
 		draw();
 	}
 	if( evt.which == 3 ) {
@@ -158,39 +202,73 @@ function mousedown(evt)
 	}
 }
 
+function execute_clipping(clip_paths)
+{
+	var clippingType = key_shift ? ClipperLib.ClipType.ctDifference : ClipperLib.ClipType.ctUnion;
+	var cpr = new ClipperLib.Clipper();
+	cpr.AddPaths(saved_floor_paths, ClipperLib.PolyType.ptSubject, true);
+	cpr.AddPaths(clip_paths, ClipperLib.PolyType.ptClip, true);
+	solution_paths = new ClipperLib.Paths();
+	cpr.Execute(clippingType, solution_paths, 1, 1);
+	
+	// may need a hack here for the L-shaped 0-width bridge
+	// https://sourceforge.net/p/jsclipper/tickets/20/
+	
+	console.log(JSON.stringify(solution_paths));
+	saved_floor_paths = solution_paths;
+}
+
 function mouseup(evt)
 {	
 	key_shift = evt.shiftKey;
 	if( evt.which == 1 && select_box == true ) {
 		select_box = false;
-		for(var row=Math.min(saved_row, curr_row); row <= Math.max(saved_row, curr_row); row++) {
-			for(var col=Math.min(saved_col, curr_col); col <= Math.max(saved_col, curr_col); col++)
-			{
-				if( key_shift ) arr_room[row][col] = 0;
-				else arr_room[row][col] = 1;
+		var clip_paths;
+		if( tool_mode == 'rect' )
+		{
+		// Create the new shape to be clipped against the existing paths
+			var minrow = Math.min(saved_row, curr_row);
+			var maxrow = Math.max(saved_row, curr_row)+1;
+			var mincol = Math.min(saved_col, curr_col);
+			var maxcol = Math.max(saved_col, curr_col)+1;
+			clip_paths = [[{X:minrow*32,Y:mincol*32}, {X:maxrow*32,Y:mincol*32}, 
+						   {X:maxrow*32,Y:maxcol*32}, {X:minrow*32,Y:maxcol*32}]];
+						   
+			execute_clipping(clip_paths);
+		}
+		if( tool_mode == 'poly' )
+		{
+			if( current_path.length > 0 ) {
+				current_path.push({X:curr_row*32,Y:curr_col*32});
+				
+				if( current_path[0].X == curr_row*32 &&
+					current_path[0].Y == curr_col*32 )
+				{
+					clip_paths = new ClipperLib.Paths();
+					clip_paths.push(current_path);
+					execute_clipping(clip_paths);
+					current_path.length = 0;
+					
+				}
 			}
+			else
+			{
+				current_path.push({X:saved_row*32,Y:saved_col*32});
+				current_path.push({X:curr_row*32,Y:curr_col*32});
+			}
+		
+			/*
+			clip_paths = new ClipperLib.Paths();
+			var temp_path = new ClipperLib.Path();
+			for( var num=0; num<10; num++)
+			{
+				temp_path.push( new ClipperLib.IntPoint(50+Math.floor(Math.random()*400),
+														50+Math.floor(Math.random()*400)) );
+			}
+			clip_paths.push(temp_path);*/
 		}
 		
-		// Create the new shape to be clipped against the existing paths
-		var minrow = Math.min(saved_row, curr_row);
-		var maxrow = Math.max(saved_row, curr_row)+1;
-		var mincol = Math.min(saved_col, curr_col);
-		var maxcol = Math.max(saved_col, curr_col)+1;
-		var clip_paths = [[{X:minrow*32,Y:mincol*32}, {X:maxrow*32,Y:mincol*32}, 
-						   {X:maxrow*32,Y:maxcol*32}, {X:minrow*32,Y:maxcol*32}]];
-		var clippingType = key_shift ? ClipperLib.ClipType.ctDifference : ClipperLib.ClipType.ctUnion;
 		
-		var cpr = new ClipperLib.Clipper();
-		cpr.AddPaths(saved_floor_paths, ClipperLib.PolyType.ptSubject, true);
-		cpr.AddPaths(clip_paths, ClipperLib.PolyType.ptClip, true);
-		solution_paths = new ClipperLib.Paths();
-		cpr.Execute(clippingType, solution_paths, 1, 1);
-		
-		// may need a hack here for the L-shaped 0-width bridge
-		// https://sourceforge.net/p/jsclipper/tickets/20/
-		
-		console.log(JSON.stringify(solution_paths));
-		saved_floor_paths = solution_paths;
 	}
 	if( evt.which == 3 && drag_pan == true ) {
 		drag_pan = false;
@@ -201,8 +279,13 @@ function mouseup(evt)
 function mousemove(evt)
 {
 	if( select_box && evt.which == 1 ) {
-		set_curr_pos(evt);
 		key_shift = evt.shiftKey;
+		if( tool_mode == 'rect' ) {
+			get_cell_pos(evt);
+		}
+		if( tool_mode == 'poly' ) {
+			get_grid_pos(evt);
+		}
 	}
 	if( drag_pan ) {
 		new_x = evt.clientX;

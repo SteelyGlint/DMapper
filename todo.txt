@@ -1,0 +1,17 @@
+
+TODO
+
+undo functionality
+
+start creating a toolbar on the left of the page
+
+
+
+
+
+
+DONE
+grid and cell position is relative to canvas
+map elements seamlessly converted into SVG paths
+polygon tool functional
+rectangle tool functional
