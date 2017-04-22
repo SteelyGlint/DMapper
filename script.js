@@ -79,24 +79,24 @@ function draw() {
 		ctx.scale(scale_factor,scale_factor);
 		ctx.translate(translate_x,translate_y);
 		
+		// draw a wide margin around the playable area
 		ctx.strokeStyle = 'rgb(180, 140, 75)';
 		ctx.lineWidth = frame_margin*2;
 		ctx.lineJoin = 'miter';
 		ctx.strokeRect(0, 0, 32*max_dim, 32*max_dim);
 		
+		// draw the background
 		var solid_img = new Image();
 		solid_img.src = 'square_rock.png';
 		var ptrn_bg = ctx.createPattern(solid_img, 'repeat');
 		ctx.fillStyle = ptrn_bg;
 		ctx.fillRect(0, 0, 32*max_dim, 32*max_dim);
 
-		var p = new Path2D('M15 15 h 80 v 80 h -80 Z');
-		
+		// set up the floor pattern and border
 		var walkable = new Image();
 		walkable.src = 'square_clean.png';
 		var ptrn = ctx.createPattern(walkable, 'repeat');
 		ctx.fillStyle = ptrn;
-		
 		ctx.setLineDash([])
 		ctx.strokeStyle = 'rgb(50, 45, 45)';
 		ctx.lineWidth = 16;
@@ -106,6 +106,7 @@ function draw() {
 		// draw the walkable floor data
 		draw_paths(ctx, saved_floor_paths);
 		
+		// draw selection graphics while making edits
 		if( !key_shift ) ctx.strokeStyle = 'rgb(90, 245, 150)';
 		else 			 ctx.strokeStyle = 'rgb(230, 125, 125)';
 		ctx.lineWidth = 2 / scale_factor;
@@ -118,6 +119,17 @@ function draw() {
 								32*Math.min(saved_col, curr_col),
 								32*(1 + Math.abs(saved_row-curr_row)),
 								32*(1 + Math.abs(saved_col-curr_col)));
+			}
+			if( tool_mode == 'circle' )
+			{
+				// draw elliptical selection box
+				ctx.setLineDash([4, 3]);
+				ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+				var paths_to_draw = new ClipperLib.Paths();
+				var circle_path = get_circle_path( saved_row, saved_col, curr_row, curr_col, 32);
+				paths_to_draw.push(circle_path);
+				
+				draw_paths(ctx, paths_to_draw);
 			}
 			if( tool_mode == 'poly' )
 			{
@@ -136,7 +148,7 @@ function draw() {
 			}
 		}
 		
-		// draw any polygon in progess
+		// draw any polygon in progress
 		if( tool_mode == 'poly' && current_path.length > 0 )
 		{
 			var paths_to_draw = new ClipperLib.Paths();
@@ -184,12 +196,14 @@ function mousedown(evt)
 	
 	if( evt.which == 1 && !drag_pan ) {
 		select_box = true;
-		if( tool_mode == 'rect' ) {
+		if( tool_mode == 'rect' || tool_mode == 'circle' )
+		{
 			get_cell_pos(evt);
 			saved_row = curr_row;
 			saved_col = curr_col;
 		}
-		if( tool_mode == 'poly' ) {
+		if( tool_mode == 'poly' )
+		{
 			get_grid_pos(evt);
 			saved_row = curr_row;
 			saved_col = curr_col;
@@ -226,7 +240,7 @@ function mouseup(evt)
 		var clip_paths;
 		if( tool_mode == 'rect' )
 		{
-		// Create the new shape to be clipped against the existing paths
+			// Create the rectangle to be clipped against the existing paths
 			var minrow = Math.min(saved_row, curr_row);
 			var maxrow = Math.max(saved_row, curr_row)+1;
 			var mincol = Math.min(saved_col, curr_col);
@@ -236,6 +250,15 @@ function mouseup(evt)
 						   
 			execute_clipping(clip_paths);
 		}
+		if( tool_mode == 'circle' )
+		{
+			// Create the ellipse to be clipped against the existing paths
+			var circle_path = get_circle_path( saved_row, saved_col, curr_row, curr_col, 32);
+			clip_paths = new ClipperLib.Paths();
+			clip_paths.push(circle_path);
+			execute_clipping(clip_paths);
+		}
+		
 		if( tool_mode == 'poly' )
 		{
 			if( current_path.length > 0 ) {
@@ -248,7 +271,6 @@ function mouseup(evt)
 					clip_paths.push(current_path);
 					execute_clipping(clip_paths);
 					current_path.length = 0;
-					
 				}
 			}
 			else
@@ -256,19 +278,7 @@ function mouseup(evt)
 				current_path.push({X:saved_row*32,Y:saved_col*32});
 				current_path.push({X:curr_row*32,Y:curr_col*32});
 			}
-		
-			/*
-			clip_paths = new ClipperLib.Paths();
-			var temp_path = new ClipperLib.Path();
-			for( var num=0; num<10; num++)
-			{
-				temp_path.push( new ClipperLib.IntPoint(50+Math.floor(Math.random()*400),
-														50+Math.floor(Math.random()*400)) );
-			}
-			clip_paths.push(temp_path);*/
 		}
-		
-		
 	}
 	if( evt.which == 3 && drag_pan == true ) {
 		drag_pan = false;
@@ -280,7 +290,7 @@ function mousemove(evt)
 {
 	if( select_box && evt.which == 1 ) {
 		key_shift = evt.shiftKey;
-		if( tool_mode == 'rect' ) {
+		if( tool_mode == 'rect' || tool_mode == 'circle' ) {
 			get_cell_pos(evt);
 		}
 		if( tool_mode == 'poly' ) {

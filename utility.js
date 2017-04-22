@@ -21,3 +21,24 @@ function get2DArray(size) {
     while(size--) { arr.push([]); }
     return arr;
 }
+
+function get_circle_path(row_1, col_1, row_2, col_2, cellsize) {
+	var radius_x = cellsize*(Math.abs( saved_row - curr_row )/2+0.5);
+	var radius_y = cellsize*(Math.abs( saved_col - curr_col )/2+0.5);
+	var center_x = cellsize*((saved_row + curr_row)/2+0.5);
+	var center_y = cellsize*((saved_col + curr_col)/2+0.5);
+	var count = 4*Math.min(radius_x, radius_y);
+	var slice = 2 * Math.PI / count;
+	var circle_path = new ClipperLib.Path();
+	for( var ii=0; ii<count; ii++)
+	{
+		var angle = ii*slice;
+		var x_coord = radius_x * Math.cos(angle)+center_x;
+        var y_coord = radius_y * Math.sin(angle)+center_y;
+		circle_path.push({X:x_coord,Y:y_coord});
+	}
+	return circle_path;
+}
+
+
+

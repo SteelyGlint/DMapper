@@ -5,13 +5,15 @@ undo functionality
 
 start creating a toolbar on the left of the page
 
+cancel polygon, confirm & finish polygon without completing the loop
 
-
+copy & paste function
 
 
 
 DONE
 grid and cell position is relative to canvas
 map elements seamlessly converted into SVG paths
-polygon tool functional
-rectangle tool functional
+polygon tool
+rectangle tool
+ellipse tool
