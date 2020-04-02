@@ -2,7 +2,7 @@
 var max_dim = 100;
 var canvas_x;
 var canvas_y;
-var frame_margin = 96;
+var square_dim = 32
 
 var saved_col = 0
 var saved_row = 0
@@ -31,6 +31,9 @@ function ev_tool_change (evt) {
 
 function init() {
 	var canvas = document.getElementById('mapzone');
+	canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;	
+	
 	var ctx = canvas.getContext('2d');
 	canvas_x = canvas.width;
 	canvas_y = canvas.height;
@@ -71,26 +74,27 @@ function draw_paths(ctx, paths)
 
 function draw() {
 	var canvas = document.getElementById('mapzone');
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	canvas_x = canvas.width;
+	canvas_y = canvas.height;
 
 	if (canvas.getContext) {
 		var ctx = canvas.getContext('2d');
+		
+		ctx.fillStyle = 'rgb(180, 140, 75)';
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		
 		ctx.save();
 		ctx.scale(scale_factor,scale_factor);
 		ctx.translate(translate_x,translate_y);
 		
-		// draw a wide margin around the playable area
-		ctx.strokeStyle = 'rgb(180, 140, 75)';
-		ctx.lineWidth = frame_margin*2;
-		ctx.lineJoin = 'miter';
-		ctx.strokeRect(0, 0, 32*max_dim, 32*max_dim);
-		
 		// draw the background
 		var solid_img = new Image();
-		solid_img.src = 'white.png';
+		solid_img.src = 'square_rock.png';
 		var ptrn_bg = ctx.createPattern(solid_img, 'repeat');
 		ctx.fillStyle = ptrn_bg;
-		ctx.fillRect(0, 0, 32*max_dim, 32*max_dim);
+		ctx.fillRect(0, 0, square_dim*max_dim, square_dim*max_dim);
 
 		// draw the crosshatch border
 		var stroke_img = new Image();
@@ -103,7 +107,7 @@ function draw() {
 		ctx.lineJoin = 'round';
 		
 		// draw the walkable floor data
-		draw_paths(ctx, saved_floor_paths);
+		//draw_paths(ctx, saved_floor_paths);
 		
 		// set up the floor pattern and line border
 		var walkable = new Image();
@@ -132,10 +136,10 @@ function draw() {
 			{
 				// draw rectangular selection box
 				ctx.setLineDash([4, 3]);
-				ctx.strokeRect( 32*Math.min(saved_row, curr_row),
-								32*Math.min(saved_col, curr_col),
-								32*(1 + Math.abs(saved_row-curr_row)),
-								32*(1 + Math.abs(saved_col-curr_col)));
+				ctx.strokeRect( square_dim*Math.min(saved_row, curr_row),
+								square_dim*Math.min(saved_col, curr_col),
+								square_dim*(1 + Math.abs(saved_row-curr_row)),
+								square_dim*(1 + Math.abs(saved_col-curr_col)));
 			}
 			if( tool_mode == 'circle' )
 			{
@@ -143,14 +147,14 @@ function draw() {
 				ctx.setLineDash([4, 3]);
 				ctx.fillStyle = 'rgba(0, 0, 0, 0)';
 				var paths_to_draw = new ClipperLib.Paths();
-				var circle_path = get_circle_path( saved_row, saved_col, curr_row, curr_col, 32);
+				var circle_path = get_circle_path( saved_row, saved_col, curr_row, curr_col, square_dim);
 				paths_to_draw.push(circle_path);
 				
 				draw_paths(ctx, paths_to_draw);
 			}
 			if( tool_mode == 'poly' )
 			{
-				ctx.strokeRect( curr_row*32-4, curr_col*32-4, 8, 8 );
+				ctx.strokeRect( curr_row*square_dim-4, curr_col*square_dim-4, 8, 8 );
 				
 				// the new line to be added
 				ctx.setLineDash([4, 3]);
@@ -159,8 +163,8 @@ function draw() {
 					ctx.moveTo(current_path[current_path.length-1].X,
 							   current_path[current_path.length-1].Y);	// previously added vertex
 				else
-					ctx.moveTo(saved_row*32, saved_col*32);	// first vertex
-				ctx.lineTo(curr_row*32, curr_col*32);		// currently selected vertex
+					ctx.moveTo(saved_row*square_dim, saved_col*square_dim);	// first vertex
+				ctx.lineTo(curr_row*square_dim, curr_col*square_dim);		// currently selected vertex
 				ctx.stroke();
 			}
 		}
@@ -183,8 +187,8 @@ function draw() {
 
 function get_cell_pos(evt)
 {
-	curr_row = Math.floor((evt.clientX-canvas_offset_x)/(32*scale_factor) - translate_x/32);
-	curr_col = Math.floor((evt.clientY-canvas_offset_y)/(32*scale_factor) - translate_y/32);
+	curr_row = Math.floor((evt.clientX-canvas_offset_x)/(square_dim*scale_factor) - translate_x/square_dim);
+	curr_col = Math.floor((evt.clientY-canvas_offset_y)/(square_dim*scale_factor) - translate_y/square_dim);
 	
 	if( curr_row < 0 ) curr_row = 0;
 	if( curr_col < 0 ) curr_col = 0;
@@ -195,8 +199,8 @@ function get_cell_pos(evt)
 
 function get_grid_pos(evt)
 {
-	curr_row = Math.floor((evt.clientX-canvas_offset_x)/(32*scale_factor)+(32/2-translate_x)/32);
-	curr_col = Math.floor((evt.clientY-canvas_offset_y)/(32*scale_factor)+(32/2-translate_y)/32);
+	curr_row = Math.floor((evt.clientX-canvas_offset_x)/(square_dim*scale_factor)+(square_dim/2-translate_x)/square_dim);
+	curr_col = Math.floor((evt.clientY-canvas_offset_y)/(square_dim*scale_factor)+(square_dim/2-translate_y)/square_dim);
 	
 	if( curr_row < 0 ) curr_row = 0;
 	if( curr_col < 0 ) curr_col = 0;
@@ -259,15 +263,15 @@ function mouseup(evt)
 			var maxrow = Math.max(saved_row, curr_row)+1;
 			var mincol = Math.min(saved_col, curr_col);
 			var maxcol = Math.max(saved_col, curr_col)+1;
-			clip_paths = [[{X:minrow*32,Y:mincol*32}, {X:maxrow*32,Y:mincol*32}, 
-						   {X:maxrow*32,Y:maxcol*32}, {X:minrow*32,Y:maxcol*32}]];
+			clip_paths = [[{X:minrow*square_dim,Y:mincol*square_dim}, {X:maxrow*square_dim,Y:mincol*square_dim}, 
+						   {X:maxrow*square_dim,Y:maxcol*square_dim}, {X:minrow*square_dim,Y:maxcol*square_dim}]];
 						   
 			execute_clipping(clip_paths);
 		}
 		if( tool_mode == 'circle' )
 		{
 			// Create the ellipse to be clipped against the existing paths
-			var circle_path = get_circle_path( saved_row, saved_col, curr_row, curr_col, 32);
+			var circle_path = get_circle_path( saved_row, saved_col, curr_row, curr_col, square_dim);
 			clip_paths = new ClipperLib.Paths();
 			clip_paths.push(circle_path);
 			execute_clipping(clip_paths);
@@ -276,10 +280,10 @@ function mouseup(evt)
 		if( tool_mode == 'poly' )
 		{
 			if( current_path.length > 0 ) {
-				current_path.push({X:curr_row*32,Y:curr_col*32});
+				current_path.push({X:curr_row*square_dim,Y:curr_col*square_dim});
 				
-				if( current_path[0].X == curr_row*32 &&
-					current_path[0].Y == curr_col*32 )
+				if( current_path[0].X == curr_row*square_dim &&
+					current_path[0].Y == curr_col*square_dim )
 				{
 					clip_paths = new ClipperLib.Paths();
 					clip_paths.push(current_path);
@@ -289,8 +293,8 @@ function mouseup(evt)
 			}
 			else
 			{
-				current_path.push({X:saved_row*32,Y:saved_col*32});
-				current_path.push({X:curr_row*32,Y:curr_col*32});
+				current_path.push({X:saved_row*square_dim,Y:saved_col*square_dim});
+				current_path.push({X:curr_row*square_dim,Y:curr_col*square_dim});
 			}
 		}
 	}
@@ -318,16 +322,18 @@ function mousemove(evt)
 		translate_x = Math.round(translate_x + (new_x - mouse_pix.x)/scale_factor);
 		translate_y = Math.round(translate_y + (new_y - mouse_pix.y)/scale_factor);
 		
-		if( translate_x > frame_margin ) translate_x = frame_margin;
-		if( translate_y > frame_margin ) translate_y = frame_margin;
+		var canvas = document.getElementById('mapzone');
 		
-		if( translate_x < canvas_x - max_dim*32 - frame_margin)
-			translate_x = canvas_x - max_dim*32 - frame_margin;
-		if( translate_y < canvas_y - max_dim*32 - frame_margin)
-			translate_y = canvas_y - max_dim*32 - frame_margin;
+		if( translate_x > canvas.width * 0.5 ) translate_x = canvas.width * 0.5;
+		if( translate_y > canvas.height * 0.5) translate_y = canvas.height * 0.5;
 		
-		//translate_x = Math.floor(translate_x);
-		//translate_y = Math.floor(translate_y);
+		if( translate_x < canvas_x - max_dim*square_dim)
+			translate_x = canvas_x - max_dim*square_dim;
+		if( translate_y < canvas_y - max_dim*square_dim)
+			translate_y = canvas_y - max_dim*square_dim;
+		
+		translate_x = Math.floor(translate_x);
+		translate_y = Math.floor(translate_y);
 		
 		mouse_pix.x = new_x;
 		mouse_pix.y = new_y;

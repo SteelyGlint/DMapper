@@ -1,7 +1,12 @@
-body {
+html, body {
 	color:#000000;
 	background-color:#B3B3B3;
-	margin:0;
+	
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    overflow: hidden;
 }
 
 #container {
@@ -19,8 +24,8 @@ a img {
 }
 
 select { 
- font-family:Verdana, Geneva, sans-serif; 
- font-size:12px; 
- background-color:#DADADA; 
- }
+	font-family:Verdana, Geneva, sans-serif; 
+	font-size:12px; 
+	background-color:#DADADA; 
+}
  
