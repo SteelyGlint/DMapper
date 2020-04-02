@@ -87,23 +87,40 @@ function draw() {
 		
 		// draw the background
 		var solid_img = new Image();
-		solid_img.src = 'square_rock.png';
+		solid_img.src = 'white.png';
 		var ptrn_bg = ctx.createPattern(solid_img, 'repeat');
 		ctx.fillStyle = ptrn_bg;
 		ctx.fillRect(0, 0, 32*max_dim, 32*max_dim);
 
-		// set up the floor pattern and border
+		// draw the crosshatch border
+		var stroke_img = new Image();
+		stroke_img.src = 'border_crosshatch_alpha.png';
+		var stroke_pattern = ctx.createPattern(stroke_img, "repeat");
+		
+		ctx.setLineDash([])
+		ctx.strokeStyle = stroke_pattern;
+		ctx.lineWidth = 104;
+		ctx.lineJoin = 'round';
+		
+		// draw the walkable floor data
+		draw_paths(ctx, saved_floor_paths);
+		
+		// set up the floor pattern and line border
 		var walkable = new Image();
 		walkable.src = 'square_clean.png';
 		var ptrn = ctx.createPattern(walkable, 'repeat');
+		var walkable = new Image();
+		walkable.src = 'square_clean.png';
+		var ptrn = ctx.createPattern(walkable, 'repeat');
+		
 		ctx.fillStyle = ptrn;
 		ctx.setLineDash([])
-		ctx.strokeStyle = 'rgb(50, 45, 45)';
-		ctx.lineWidth = 16;
+		ctx.strokeStyle = 'rgb(30, 30, 30)';
+		ctx.lineWidth = 12;
 		ctx.lineJoin = 'miter';
 		ctx.miterLimit = 3
 		
-		// draw the walkable floor data
+		// draw the walkable floor data a second time
 		draw_paths(ctx, saved_floor_paths);
 		
 		// draw selection graphics while making edits
@@ -224,9 +241,6 @@ function execute_clipping(clip_paths)
 	cpr.AddPaths(clip_paths, ClipperLib.PolyType.ptClip, true);
 	solution_paths = new ClipperLib.Paths();
 	cpr.Execute(clippingType, solution_paths, 1, 1);
-	
-	// may need a hack here for the L-shaped 0-width bridge
-	// https://sourceforge.net/p/jsclipper/tickets/20/
 	
 	console.log(JSON.stringify(solution_paths));
 	saved_floor_paths = solution_paths;
