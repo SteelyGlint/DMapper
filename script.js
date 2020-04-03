@@ -17,6 +17,8 @@ var translate_x = 0;
 var translate_y = 0;
 var canvas_offset_x = 0;
 var canvas_offset_y = 0;
+var max_scale = 2
+var min_scale = 0.5
 
 var saved_floor_paths = new ClipperLib.Paths();
 var solution_paths = new ClipperLib.Paths();
@@ -28,6 +30,22 @@ var tool_mode = 'poly';
 function ev_tool_change (evt) { 
 	tool_mode = this.value;
 } 
+
+function constrain_translation()
+{
+	var margin_x = canvas_x * 0.5 / scale_factor
+	var margin_y = canvas_y * 0.5 / scale_factor
+	if( translate_x > margin_x ) translate_x = margin_x;
+	if( translate_y > margin_y) translate_y = margin_y;
+	
+	if( translate_x < margin_x - max_dim * square_dim)
+		translate_x = margin_x - max_dim * square_dim;
+	if( translate_y < margin_y - max_dim * square_dim)
+		translate_y = margin_y - max_dim * square_dim;
+	
+	translate_x = Math.floor(translate_x);
+	translate_y = Math.floor(translate_y);
+}
 
 function init() {
 	var canvas = document.getElementById('mapzone');
@@ -78,6 +96,7 @@ function draw() {
 	canvas.height = window.innerHeight;
 	canvas_x = canvas.width;
 	canvas_y = canvas.height;
+	constrain_translation()
 
 	if (canvas.getContext) {
 		var ctx = canvas.getContext('2d');
@@ -306,6 +325,9 @@ function mouseup(evt)
 
 function mousemove(evt)
 {
+	new_mouse_x = evt.clientX;
+	new_mouse_y = evt.clientY;
+		
 	if( select_box && evt.which == 1 ) {
 		key_shift = evt.shiftKey;
 		if( tool_mode == 'rect' || tool_mode == 'circle' ) {
@@ -316,28 +338,17 @@ function mousemove(evt)
 		}
 	}
 	if( drag_pan ) {
-		new_x = evt.clientX;
-		new_y = evt.clientY;
+		translate_x = Math.round(translate_x + (new_mouse_x - mouse_pix.x)/scale_factor);
+		translate_y = Math.round(translate_y + (new_mouse_y - mouse_pix.y)/scale_factor);
 		
-		translate_x = Math.round(translate_x + (new_x - mouse_pix.x)/scale_factor);
-		translate_y = Math.round(translate_y + (new_y - mouse_pix.y)/scale_factor);
+		constrain_translation()
 		
-		var canvas = document.getElementById('mapzone');
-		
-		if( translate_x > canvas.width * 0.5 ) translate_x = canvas.width * 0.5;
-		if( translate_y > canvas.height * 0.5) translate_y = canvas.height * 0.5;
-		
-		if( translate_x < canvas_x - max_dim*square_dim)
-			translate_x = canvas_x - max_dim*square_dim;
-		if( translate_y < canvas_y - max_dim*square_dim)
-			translate_y = canvas_y - max_dim*square_dim;
-		
-		translate_x = Math.floor(translate_x);
-		translate_y = Math.floor(translate_y);
-		
-		mouse_pix.x = new_x;
-		mouse_pix.y = new_y;
+		//var viewport_center_x = (canvas.width * 0.5) - translate_x
+		//if (viewport_center_x < 0) translate_x = canvas.width * 0.5
 	}
+	
+	mouse_pix.x = new_mouse_x;
+	mouse_pix.y = new_mouse_y;
 	draw();
 }
 
@@ -345,11 +356,31 @@ function mousewheel(evt)
 {
 	var delta = Math.max(-1, Math.min(1, (evt.wheelDelta || -evt.detail)));
 	
-	if( delta > 0 ) scale_factor = scale_factor * 2;
-	else scale_factor = scale_factor * 0.5;
+	if( delta > 0)
+	{
+		// zoom in, towards the cursor
+		if(scale_factor < max_scale)
+		{
+			translate_x -= mouse_pix.x * 0.5 / scale_factor
+			translate_y -= mouse_pix.y * 0.5 / scale_factor
+			scale_factor = scale_factor * 2;
+			constrain_translation()
+		}
+	}
+	else 
+	{
+		// zoom out from the center of the canvas
+		if (scale_factor > min_scale)
+		{
+			scale_factor = scale_factor * 0.5;
+			translate_x += mouse_pix.x * 0.5 / scale_factor
+			translate_y += mouse_pix.y * 0.5 / scale_factor
+			constrain_translation()
+		}
+	}
 	
-	if( scale_factor > 2) scale_factor = 2;
-	if( scale_factor < 0.5) scale_factor = 0.5;
+	if( scale_factor > max_scale) scale_factor = max_scale;
+	if( scale_factor < min_scale) scale_factor = min_scale;
 	
 	draw();
 }
